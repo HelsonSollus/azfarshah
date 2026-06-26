@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Azfar's Weather Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
     <style>
         :root {
             --bg-earth: #f4f1ea;       /* Soft sandy/clay background */
@@ -148,11 +147,8 @@
 </div>
 
 <script>
-    // Register the DataLabels plugin to Chart.js globally
-    Chart.register(ChartDataLabels);
-
     // API Setup
-    const API_KEY = 'fd81053931c3421ea04134950262506'; // Replace with your active WeatherAPI key
+    const API_KEY = 'fd81053931c3421ea04134950262506'; // Make sure your active WeatherAPI key is pasted here
     const CITY_QUERY = 'Kuala Lumpur'; 
     const ENDPOINT_URL = `https://api.weatherapi.com/v1/current.json?key=${API_KEY}&q=${encodeURIComponent(CITY_QUERY)}&aqi=no`;
 
@@ -166,7 +162,6 @@
             document.getElementById('status').style.display = 'none';
             document.getElementById('dashboard').style.display = 'block';
 
-            // Bind values to Document Object Model
             document.getElementById('loc-name').innerText = `${data.location.name}, ${data.location.country}`;
             document.getElementById('loc-condition').innerText = `${data.current.condition.text} (Wind Direction: ${data.current.wind_dir})`;
             document.getElementById('loc-time').innerText = data.current.last_updated;
@@ -175,35 +170,27 @@
 
         } catch (err) {
             console.error(err);
-            document.getElementById('status').innerText = `Configuration Halt: ${err.message}. Please insert your valid key on line 125.`;
+            document.getElementById('status').innerText = `Configuration Halt: ${err.message}. Please check your key value configuration.`;
         }
     }
 
     function buildAnalyticalCharts(current) {
-        // Shared gridline styling options to make the graph look highly detailed
+        // Built-in analytical options configuration with explicit gridlines
         const analyticalGridOpts = {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
                 legend: { labels: { color: '#2c3e2b', font: { weight: 'bold' } } },
-                datalabels: {
-                    align: 'top',
-                    anchor: 'end',
-                    backgroundColor: '#3d6346',
-                    borderRadius: 4,
-                    color: '#ffffff',
-                    font: { size: 10, weight: 'bold' },
-                    formatter: (value) => Math.round(value)
-                }
+                tooltip: { enabled: true } // Tooltips show exact data cleanly when hovering
             },
             scales: {
                 x: {
-                    grid: { display: true, color: '#e4dfcb' }, // Sharp vertical grid lines
+                    grid: { display: true, color: '#e4dfcb' },
                     ticks: { color: '#2c3e2b', font: { weight: '500' } }
                 },
                 y: {
                     beginAtZero: true,
-                    grid: { display: true, color: '#e4dfcb' }, // Sharp horizontal grid lines
+                    grid: { display: true, color: '#e4dfcb' },
                     ticks: { color: '#2c3e2b' }
                 }
             }
@@ -216,7 +203,7 @@
             data: {
                 labels: ['Air Temperature', 'Feels Like Temp'],
                 datasets: [{
-                    label: 'Values in Celcius (°C)',
+                    label: 'Values in Celsius (°C)',
                     data: [current.temp_c, current.feelslike_c],
                     backgroundColor: ['rgba(122, 154, 96, 0.85)', 'rgba(200, 122, 83, 0.85)'],
                     borderColor: ['#556b2f', '#c87a53'],
@@ -232,9 +219,9 @@
         new Chart(ctxMoisture, {
             type: 'bar',
             data: {
-                labels: ['Relative Humidity', 'Total Cloud Cover', 'UV Safety Index'],
+                labels: ['Relative Humidity (%)', 'Total Cloud Cover (%)', 'UV Safety Index'],
                 datasets: [{
-                    label: 'Scale Matrix Percentage / Index',
+                    label: 'Scale Matrix Value',
                     data: [current.humidity, current.cloud, current.uv],
                     backgroundColor: ['rgba(61, 99, 70, 0.8)', 'rgba(163, 184, 153, 0.85)', 'rgba(218, 165, 32, 0.8)'],
                     borderColor: ['#3d6346', '#a3b899', '#b8860b'],
@@ -245,14 +232,8 @@
             options: analyticalGridOpts
         });
 
-        // --- CHART 3: KINETIC FORCES (WIND & PRESSURE) ---
+        // --- CHART 3: KINETIC FORCES ---
         const ctxKinetic = document.getElementById('kineticChart').getContext('2d');
-        
-        // Deep copy grid options for chart customization
-        let kineticOpts = JSON.parse(JSON.stringify(analyticalGridOpts));
-        // Remove the top datalabel anchor rule for lines so it formats nicely
-        kineticOpts.plugins.datalabels.align = 'right';
-
         new Chart(ctxKinetic, {
             type: 'line',
             data: {
@@ -269,7 +250,7 @@
                     fill: true
                 }]
             },
-            options: kineticOpts
+            options: analyticalGridOpts
         });
     }
 
