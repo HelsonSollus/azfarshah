@@ -150,8 +150,8 @@
     // API Configurations
     const API_KEY = 'fd81053931c3421ea04134950262506'; // Ensure your active key is written here
     const CITY_QUERY = 'Kuala Lumpur'; 
-    // Shifted endpoint to forecast.json to parse historical 24-hour timeline matrices
-    const ENDPOINT_URL = `https://api.weatherapi.com/v1/forecast.json?key=${API_KEY}&q=${encodeURIComponent(CITY_QUERY)}&days=1&aqi=no&alerts=no`;
+    // Request 2 days of forecast so when we filter from "current hour", we can cleanly loop into tomorrow's hours!
+    const ENDPOINT_URL = `https://api.weatherapi.com/v1/forecast.json?key=${API_KEY}&q=${encodeURIComponent(CITY_QUERY)}&days=2&aqi=no&alerts=no`;
 
     async function fetchChronologicalWeatherData() {
         try {
@@ -164,12 +164,24 @@
             document.getElementById('dashboard').style.display = 'block';
 
             document.getElementById('loc-name').innerText = `${data.location.name}, ${data.location.country}`;
-            document.getElementById('loc-time').innerText = data.location.localtime;
-
-            // Extract the 24 hourly data points array
-            const hourlyArray = data.forecast.forecastday[0].hour;
             
-            buildTimelineCharts(hourlyArray);
+            // Get current Malaysia local time from the API location data
+            const localTimeStr = data.location.localtime; // e.g., "2026-06-27 19:23"
+            document.getElementById('loc-time').innerText = localTimeStr;
+
+            // Extract the current hour number (e.g., 19)
+            const currentHour = new Date(localTimeStr.replace(/-/g, '/')).getHours();
+
+            // Combine day 1 and day 2 hourly arrays so we have a continuous 48-hour timeline pool
+            const day1Hours = data.forecast.forecastday[0].hour;
+            const day2Hours = data.forecast.forecastday[1].hour;
+            const combinedHours = day1Hours.concat(day2Hours);
+
+            // FILTER: Start exactly from the current Malaysia hour and take the next 12 hours
+            // (12 hours keeps the graph highly readable and rolling forward in real time)
+            const rollingTimeline = combinedHours.slice(currentHour, currentHour + 12);
+            
+            buildTimelineCharts(rollingTimeline);
 
         } catch (err) {
             console.error(err);
@@ -178,17 +190,15 @@
     }
 
     function buildTimelineCharts(hours) {
-        // Step 1: Format date and time for the horizontal axis labels
-        // We will filter or sample data points to ensure the text axis lines look neat and clean
+        // Format date and time for the horizontal axis labels
         const labelsTimeline = hours.map(item => {
-            // item.time looks like "2026-06-27 15:00"
             const parts = item.time.split(' ');
-            const datePart = parts[0].substring(5); // Extracts MM-DD format (e.g. "06-27")
-            const timePart = parts[1];             // Extracts HH:MM format (e.g. "15:00")
-            return `${timePart} (${datePart})`;    // Yields cleanly structured format: "15:00 (06-27)"
+            const datePart = parts[0].substring(5); // Extracts MM-DD (e.g. "06-27")
+            const timePart = parts[1];             // Extracts HH:MM (e.g. "19:00")
+            return `${timePart} (${datePart})`;    
         });
 
-        // Step 2: Extract timeline metrics arrays
+        // Extract metrics arrays for the rolling window
         const tempValues = hours.map(item => item.temp_c);
         const humidityValues = hours.map(item => item.humidity);
         const cloudValues = hours.map(item => item.cloud);
@@ -207,7 +217,7 @@
             scales: {
                 x: {
                     grid: { display: true, color: '#e4dfcb' },
-                    ticks: { color: '#2c3e2b', maxRotation: 45, minRotation: 45, font: { size: 10, weight: '500' } }
+                    ticks: { color: '#2c3e2b', maxRotation: 0, minRotation: 0, font: { size: 10, weight: '500' } }
                 },
                 y: {
                     beginAtZero: false,
@@ -217,10 +227,10 @@
             }
         };
 
-        // --- CHART 1: THERMAL PROFILE (LINE PATTERN) ---
-        // Changed to line charts because showing hourly chronological tracking trends over 24 points fits beautifully as an analytical wave line!
+        // --- CHART 1: THERMAL PROFILE ---
         const ctxThermal = document.getElementById('thermalChart').getContext('2d');
-        new Chart(ctxThermal, {
+        if(window.myChart1) window.myChart1.destroy(); // Prevent canvas overlay glitches
+        window.myChart1 = new Chart(ctxThermal, {
             type: 'line',
             data: {
                 labels: labelsTimeline,
@@ -230,7 +240,7 @@
                     borderColor: '#c87a53',
                     backgroundColor: 'rgba(200, 122, 83, 0.1)',
                     borderWidth: 3,
-                    pointRadius: 2,
+                    pointRadius: 3,
                     tension: 0.2,
                     fill: true
                 }]
@@ -238,9 +248,10 @@
             options: timelineBaseOptions
         });
 
-        // --- CHART 2: MOISTURE & CLOUD COVER PROGRESSION ---
+        // --- CHART 2: MOISTURE & CLOUD COVER ---
         const ctxMoisture = document.getElementById('moistureChart').getContext('2d');
-        new Chart(ctxMoisture, {
+        if(window.myChart2) window.myChart2.destroy();
+        window.myChart2 = new Chart(ctxMoisture, {
             type: 'line',
             data: {
                 labels: labelsTimeline,
@@ -251,7 +262,7 @@
                         borderColor: '#3d6346',
                         backgroundColor: 'transparent',
                         borderWidth: 2,
-                        pointRadius: 2,
+                        pointRadius: 3,
                         tension: 0.2
                     },
                     {
@@ -260,7 +271,7 @@
                         borderColor: '#a3b899',
                         backgroundColor: 'transparent',
                         borderWidth: 2,
-                        pointRadius: 2,
+                        pointRadius: 3,
                         tension: 0.2
                     }
                 ]
@@ -270,7 +281,8 @@
 
         // --- CHART 3: KINETIC VELOCITY TRENDS ---
         const ctxKinetic = document.getElementById('kineticChart').getContext('2d');
-        new Chart(ctxKinetic, {
+        if(window.myChart3) window.myChart3.destroy();
+        window.myChart3 = new Chart(ctxKinetic, {
             type: 'line',
             data: {
                 labels: labelsTimeline,
@@ -281,7 +293,7 @@
                         borderColor: '#7a9a60',
                         backgroundColor: 'transparent',
                         borderWidth: 2,
-                        pointRadius: 2,
+                        pointRadius: 3,
                         tension: 0.2
                     },
                     {
@@ -290,7 +302,7 @@
                         borderColor: '#b8860b',
                         backgroundColor: 'transparent',
                         borderWidth: 2,
-                        pointRadius: 2,
+                        pointRadius: 3,
                         tension: 0.2
                     }
                 ]
